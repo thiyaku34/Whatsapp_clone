@@ -1,11 +1,14 @@
-import os
+
 from flask import Flask, render_template, request, redirect, session, jsonify
 from flask_socketio import SocketIO, emit
 import sqlite3
 
+# -------------------------------
+# Flask + SocketIO setup
+# -------------------------------
 app = Flask(__name__)
 app.secret_key = "secret123"
-socketio = SocketIO(app, cors_allowed_origins="*")  # Allow cross-origin
+socketio = SocketIO(app, cors_allowed_origins="*")
 
 # -------------------------------
 # Database helper
@@ -18,6 +21,40 @@ def get_db():
 # -------------------------------
 # Routes
 # -------------------------------
+
+@app.route("/", methods=["GET", "POST"])
+def login_page():
+    if request.method == "POST":
+        username = request.form["username"].strip()
+        password = request.form["password"].strip()
+        db = get_db()
+        user = db.execute("SELECT * FROM users WHERE username=? AND password=?",
+                          (username,password)).fetchone()
+        if user:
+            session["username"] = username
+            return redirect("/home")
+        return "Login Failed"
+    return render_template("login.html")
+
+@app.route("/home")
+def home_page():
+    if "username" not in session:
+        return redirect("/")
+    db = get_db()
+    users = db.execute("SELECT username FROM users WHERE username != ?",
+                       (session["username"],)).fetchall()
+    return render_template("home.html", users=users)
+
+@app.route("/chat/<user>")
+def chat_page(user):
+    if "username" not in session:
+        return redirect("/")
+    return render_template("chat.html", user=user, me=session["username"])
+
+@app.route("/logout")
+def logout_page():
+    session.pop("username", None)
+    return redirect("/")
 
 @app.route("/add_contact", methods=["POST"])
 def add_contact():
@@ -44,43 +81,10 @@ def delete_contact():
     db.commit()
     return jsonify({"status":"success","username":user_to_delete})
 
-@app.route("/", methods=["GET", "POST"])
-def login():
-    if request.method=="POST":
-        username = request.form["username"]
-        password = request.form["password"]
-        db = get_db()
-        user = db.execute("SELECT * FROM users WHERE username=? AND password=?",
-                          (username,password)).fetchone()
-        if user:
-            session["username"] = username
-            return redirect("/home")
-        return "Login Failed"
-    return render_template("login.html")
-
-@app.route("/home")
-def home():
-    if "username" not in session:
-        return redirect("/")
-    db = get_db()
-    users = db.execute("SELECT username FROM users WHERE username != ?",
-                       (session["username"],)).fetchall()
-    return render_template("home.html", users=users)
-
-@app.route("/chat/<user>")
-def chat(user):
-    if "username" not in session:
-        return redirect("/")
-    return render_template("chat.html", user=user, me=session["username"])
-
-@app.route("/logout")
-def logout():
-    session.pop("username", None)
-    return redirect("/")
-
 # -------------------------------
-# Socket.IO Events
+# Socket.IO events
 # -------------------------------
+
 @socketio.on("message")
 def handle_message(data):
     db = get_db()
@@ -97,6 +101,7 @@ def handle_image(data):
 def handle_typing(data):
     emit("typing", data, broadcast=True)
 
+# WebRTC signaling
 @socketio.on("call_offer")
 def call_offer(data):
     emit("call_offer", data, broadcast=True)
@@ -110,8 +115,15 @@ def ice_candidate(data):
     emit("ice_candidate", data, broadcast=True)
 
 # -------------------------------
-# Run server
+# Run server (Render compatible)
 # -------------------------------
+import os
+from flask import Flask
+from flask_socketio import SocketIO
+
+app = Flask(__name__)
+socketio = SocketIO(app, cors_allowed_origins="*")
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    socketio.run(app, host="0.0.0.0", port=port, debug=True)
+    socketio.run(app, host="0.0.0.0", port=port)
