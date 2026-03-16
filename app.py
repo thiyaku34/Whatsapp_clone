@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, redirect, session
+import os
+from flask import Flask, render_template, request, redirect, session, jsonify
 from flask_socketio import SocketIO, emit
 import sqlite3
 
@@ -17,7 +18,6 @@ def get_db():
 # -------------------------------
 # Routes
 # -------------------------------
-from flask import jsonify
 
 @app.route("/add_contact", methods=["POST"])
 def add_contact():
@@ -81,32 +81,22 @@ def logout():
 # -------------------------------
 # Socket.IO Events
 # -------------------------------
-
-# Text messages
 @socketio.on("message")
 def handle_message(data):
-    """
-    data = { user: sender, to: receiver, message: text }
-    """
     db = get_db()
     db.execute("INSERT INTO messages (sender, receiver, message) VALUES (?, ?, ?)",
                (data["user"], data["to"], data["message"]))
     db.commit()
     emit("new_message", data, broadcast=True)
 
-# Image messages
 @socketio.on("image")
 def handle_image(data):
     emit("new_image", data, broadcast=True)
 
-# Typing indicator
 @socketio.on("typing")
 def handle_typing(data):
     emit("typing", data, broadcast=True)
 
-# -------------------------------
-# WebRTC Signaling for Voice/Video
-# -------------------------------
 @socketio.on("call_offer")
 def call_offer(data):
     emit("call_offer", data, broadcast=True)
@@ -119,23 +109,9 @@ def call_answer(data):
 def ice_candidate(data):
     emit("ice_candidate", data, broadcast=True)
 
-@app.route('/')
-def home():
-    return "Hello, WhatsApp clone on Render!"
-
 # -------------------------------
 # Run server
 # -------------------------------
-import os
-from flask import Flask
-from flask_socketio import SocketIO
-
-app = Flask(__name__)
-socketio = SocketIO(app)
-
-
-
 if __name__ == "__main__":
-    # Render gives the port via environment variable
     port = int(os.environ.get("PORT", 5000))
     socketio.run(app, host="0.0.0.0", port=port, debug=True)
