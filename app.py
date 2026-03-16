@@ -9,7 +9,7 @@ import eventlet
 # -------------------------------
 app = Flask(__name__)
 app.secret_key = "secret123"
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")  # use eventlet
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")  # force eventlet
 
 # -------------------------------
 # Database helper
@@ -114,9 +114,8 @@ def ice_candidate(data):
     emit("ice_candidate", data, broadcast=True)
 
 # -------------------------------
-# Run server (Render production)
+# Run server (production-safe)
 # -------------------------------
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
-    # Use eventlet's WSGI server (production-safe)
     eventlet.wsgi.server(eventlet.listen(("0.0.0.0", port)), app)
