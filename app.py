@@ -119,6 +119,10 @@ def call_answer(data):
 def ice_candidate(data):
     emit("ice_candidate", data, broadcast=True)
 
+@app.route('/')
+def home():
+    return "Hello, WhatsApp clone on Render!"
+
 # -------------------------------
 # Run server
 # -------------------------------
@@ -129,9 +133,7 @@ from flask_socketio import SocketIO
 app = Flask(__name__)
 socketio = SocketIO(app)
 
-@app.route('/')
-def home():
-    return "Hello, WhatsApp clone on Render!"
+
 
 if __name__ == "__main__":
     # Render gives the port via environment variable
